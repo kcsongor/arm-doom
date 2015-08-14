@@ -6,8 +6,11 @@ Written in about 3 weeks.
 # People
 
 Bálint Rikker
+
 Csongor Kiss
+
 Sicong Li
+
 Toby Shaw
 
 # Video
