@@ -1,0 +1,201 @@
+#!/usr/bin/perl
+use v5.18;
+no warnings 'experimental::smartmatch';
+
+my $file = shift or die "No input file specified\n";
+open IF, "<", $file or die "Couldn't open file $file: $!\n";
+open OF, ">", "sector.s" or die "Couldn't create file: $!\n";
+
+my $vertex_counter = 0;
+
+say OF "/* GENERATED CODE */";
+say OF ".section .data";
+say OF ".align 4";
+say OF;
+
+my @sectors;
+my $sector = {
+  "vertices"   => [],
+  "neighbours" => [],
+  "things"     => []
+};
+
+my $current_section = "vertices";
+# Reads a line 
+read_line:
+  # If EOF, finish current sector
+  goto sector_read unless defined(my $line = <IF>);
+  
+  # Some input sanitisation
+  chomp($line);
+  $line =~ s/^ +//;
+  $line =~ s/ +/ /;
+  $line =~ s/( +)$//;
+
+  # If row is a comment, skip it
+  goto read_line if $line =~ m/^#/;
+
+  # Sector def finished, save and process next one
+  goto sector_read if $line =~ m/^sector/;
+
+  # Check if current line is a new section in the data
+  if ($line =~ m/:/) {
+    $current_section = $line =~ s/:$//r;
+    goto read_line;
+  }
+
+  given ($current_section) {
+    when ("vertices") {
+      push @{$sector->{"vertices"}}, $line;
+      push @{$sector->{"neighbours"}}, "-1";
+    }
+    when ("things") {
+      push @{$sector->{"things"}}, $line; 
+    }
+  }
+
+  # Next vertex
+  goto read_line;
+
+# Sector finished reading. EOF or new sector reached
+sector_read:
+  # Save the current sector in the @sectors list
+  push @sectors, $sector if scalar @{$sector->{"vertices"}};
+
+  # Reset temporary sector
+  $sector = {
+    "vertices"   => [],
+    "neighbours" => [],
+    "things"     => []
+  };
+
+  $current_section = "vertices";
+
+  # Start over if EOF hasn't been reached
+  goto read_line if defined($line);
+
+
+# Set neighbours of sectors if two
+# are sharing the same wall
+first_sector: for (my $a = 0; $a < @sectors; $a++) {
+  second_sector: for (my $b = 0; $b < $a; $b++) {
+    my $sector_a = $sectors[$a];
+    my $sector_b = $sectors[$b];
+    my @vertices_a = @{$sector_a->{"vertices"}};
+    my @vertices_b = @{$sector_b->{"vertices"}};
+
+    for (my $a_vertex = 0; $a_vertex < @vertices_a; $a_vertex++) {
+      for (my $b_vertex = 0; $b_vertex < @vertices_b; $b_vertex++) {
+        if ($vertices_a[$a_vertex] eq $vertices_b[$b_vertex]) {
+          # If the next one or the previous one is equal from the other sector,
+          # we have a matching wall
+          # We need to check both, because the order of a wall's 
+          # vertices may be different in two different sectors
+
+          # Make sure b is only accessed legally
+          my $b_position =  $b_vertex;
+          if ($b_position + 1 == @vertices_b) {
+            $b_position=-1;
+          }
+
+          if ($vertices_a[$a_vertex-1] eq $vertices_b[$b_position+1]) {
+              @{$sector_a->{"neighbours"}}[$a_vertex-1] = "sector$b";
+              @{$sector_b->{"neighbours"}}[$b_vertex] = "sector$a";
+          }
+          if ($vertices_a[$a_vertex-1] eq $vertices_b[$b_vertex-1]) {
+              @{$sector_a->{"neighbours"}}[$a_vertex-1] = "sector$b";
+              @{$sector_b->{"neighbours"}}[$b_vertex-1] = "sector$a";
+          }
+        }
+      }
+    }
+
+  }
+}
+
+print_file:
+
+my @vertices;
+my $sector_count = 0;
+
+for my $sector (@sectors) {
+  say OF ".globl sector$sector_count";
+  say OF "sector$sector_count:";
+  my @sector_vertices = @{$sector->{"vertices"}};
+
+  # TODO: process these from the input file too
+  say OF "
+  .float 0              /* floor    */
+  .float 20             /* ceiling  */
+  .int n$sector_count               /* address of neighbours */
+  .int t$sector_count               /* address of things */
+  .int TextureAddress   /* Texture address for sector */
+  .int -1               /* Floor colour, -1 if default */
+  .int -1               /* Ceiling colour, -1 if default */
+  ";
+
+  say OF "  .int " . scalar @sector_vertices . "       /* Number of walls */";
+
+  for my $sector_vertex (@sector_vertices) {
+    say OF "  .int " . push_vertex($sector_vertex) 
+                     . "      /* ($sector_vertex) */";
+  }
+  # Circular wall structure
+  say OF "  .int " . push_vertex($sector_vertices[0]) 
+                   . "      /* ($sector_vertices[0]) */";
+
+  say OF "n$sector_count:";
+  for my $neighbour (@{$sector->{"neighbours"}}) {
+    say OF "  .int $neighbour";
+  }
+
+  say OF "t$sector_count:";
+  for (my $i = 0; $i < 10; $i++) {
+    my $thing;
+    $thing = (@{$sector->{"things"}})[$i] or $thing = 0;
+    say OF "  .int $thing";  
+
+  }
+
+  $sector_count++;
+  say OF;
+}
+
+close (OF);
+close (IF);
+
+open VOF, ">", "vertex.s" or die "Couldn't create file: $!\n";
+my $vertex_count = 0;
+say VOF "/* GENERATED CODE */";
+say VOF ".section .data";
+say VOF ".align 4";
+say VOF;
+for my $vertex (@vertices) {
+  my ($x, $y) = split /, /, $vertex;
+  say VOF ".globl vertex$vertex_count";
+  say VOF "vertex$vertex_count:";
+  say VOF "  .float $x";
+  say VOF "  .float $y";
+  say VOF;
+  $vertex_count++;
+}
+close (VOF);
+
+sub push_vertex {
+  my $vertex_string = shift;
+  my $key = 0;
+  my $found = 0;
+
+  for my $vertex (@vertices) {
+    if ($vertex eq $vertex_string) {
+      $found = 1;
+      last;
+    }
+    $key++;
+  }
+  unless ($found) {
+    $vertices[@vertices] = $vertex_string;
+  }
+  return "vertex$key";
+}
+

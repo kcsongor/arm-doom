@@ -1,0 +1,21 @@
+AMMO 60, 410
+HEALTH 150, 410
+
+arm11 225, 410
+arm12 245,
+arm13 265,
+
+arm2_ xxx, 435
+
+
+avatar 295(-345), 405
+
+ARMOR 365, 410
+
+cur  565, xxx
+max  620, xxx
+
+bull   x, 415
+shell  x, 430
+rckt   x, 445
+cell   x, 460

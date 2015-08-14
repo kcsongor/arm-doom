@@ -1,0 +1,26 @@
+sector0:
+  vertices:
+  0, 0
+  16, 0
+  16, 16
+  0, 16
+  things:
+  enemy_0
+sector1:
+  vertices:
+  16, 0
+  32, 0
+  32, 16
+  16, 16
+sector2:
+  vertices:
+  16, 16
+  32, 16
+  32, 32
+  16, 32
+sector3:
+  vertices:
+  0, 16
+  16, 16
+  16, 32
+  0, 32
