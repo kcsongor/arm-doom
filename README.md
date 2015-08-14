@@ -1,6 +1,6 @@
 # Description
 
-Imperial College 2014 first year Raspberry Pi bare metal ARM assembly project.
+Imperial College first year Raspberry Pi bare metal ARM assembly project.
 Written in about 3 weeks.
 
 # People
