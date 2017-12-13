@@ -15,4 +15,4 @@ Toby Shaw
 
 # Video
 
-https://www.youtube.com/watch?v=jeHtktKtGYQ
+[![Video on YouTube](https://img.youtube.com/vi/jeHtktKtGYQ/0.jpg)](https://www.youtube.com/watch?v=jeHtktKtGYQ)
